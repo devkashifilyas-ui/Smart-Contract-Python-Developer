@@ -1,0 +1,1381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CoinQuant – EVM Contract System Demo</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Fira+Code:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #03040a;
+  --surface: #080c14;
+  --card: #0c1220;
+  --border: #111d35;
+  --accent: #00d4ff;
+  --accent2: #7fff6a;
+  --accent3: #ff6b35;
+  --accent4: #b06aff;
+  --text: #e2eeff;
+  --muted: #4a6080;
+  --mid: #8aabcc;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Syne', sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* NOISE OVERLAY */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events: none; z-index: 0; opacity: 0.4;
+}
+
+/* GRID BG */
+body::after {
+  content: '';
+  position: fixed; inset: 0;
+  background-image:
+    linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+  background-size: 48px 48px;
+  pointer-events: none; z-index: 0;
+}
+
+body > * { position: relative; z-index: 1; }
+
+/* ── TOP NAV ── */
+.topnav {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 36px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(3,4,10,0.9);
+  backdrop-filter: blur(12px);
+  position: sticky; top: 0; z-index: 100;
+}
+
+.logo {
+  font-size: 20px; font-weight: 800; letter-spacing: -0.02em;
+  color: var(--text);
+}
+.logo span { color: var(--accent); }
+
+.nav-pills { display: flex; gap: 4px; }
+
+.npill {
+  font-family: 'Fira Code', monospace;
+  font-size: 11px; padding: 6px 14px;
+  border-radius: 4px; cursor: pointer;
+  border: 1px solid var(--border); color: var(--muted);
+  background: none; transition: all 0.18s;
+  letter-spacing: 0.04em;
+}
+.npill.active, .npill:hover {
+  background: rgba(0,212,255,0.08);
+  border-color: rgba(0,212,255,0.3);
+  color: var(--accent);
+}
+
+.chain-badge {
+  display: flex; align-items: center; gap: 8px;
+  font-family: 'Fira Code', monospace; font-size: 11px;
+  color: var(--accent2);
+  background: rgba(127,255,106,0.07);
+  border: 1px solid rgba(127,255,106,0.2);
+  padding: 6px 14px; border-radius: 4px;
+}
+.chain-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--accent2);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse { 0%,100% { opacity:1;transform:scale(1); } 50% { opacity:0.4;transform:scale(0.7); } }
+@keyframes fadeSlide { from { opacity:0;transform:translateY(10px); } to { opacity:1;transform:translateY(0); } }
+@keyframes shimmer { from { background-position: -200% center; } to { background-position: 200% center; } }
+@keyframes countUp { from { opacity:0; } to { opacity:1; } }
+@keyframes scan { from { transform:translateY(-100%); } to { transform:translateY(200vh); } }
+
+/* ── TABS ── */
+.tab { display: none; }
+.tab.active { display: block; animation: fadeSlide 0.3s ease; }
+
+/* ── OVERVIEW LAYOUT ── */
+.overview-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  gap: 1px;
+  background: var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.metric-block {
+  background: var(--surface);
+  padding: 28px 32px;
+  position: relative; overflow: hidden;
+  cursor: default;
+  transition: background 0.2s;
+}
+.metric-block:hover { background: var(--card); }
+
+.metric-block::after {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0;
+  height: 2px;
+}
+.metric-block:nth-child(1)::after { background: var(--accent); }
+.metric-block:nth-child(2)::after { background: var(--accent2); }
+.metric-block:nth-child(3)::after { background: var(--accent3); }
+.metric-block:nth-child(4)::after { background: var(--accent4); }
+
+.metric-label {
+  font-family: 'Fira Code', monospace;
+  font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 10px;
+}
+
+.metric-val {
+  font-size: 32px; font-weight: 800; letter-spacing: -0.03em;
+  line-height: 1;
+  background: linear-gradient(135deg, var(--text) 0%, var(--mid) 100%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  margin-bottom: 6px;
+}
+
+.metric-val.cyan { background: linear-gradient(135deg, var(--accent), #0086aa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.metric-val.green { background: linear-gradient(135deg, var(--accent2), #3ab02a); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.metric-val.orange { background: linear-gradient(135deg, var(--accent3), #cc3300); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.metric-val.purple { background: linear-gradient(135deg, var(--accent4), #7033cc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+
+.metric-sub {
+  font-family: 'Fira Code', monospace;
+  font-size: 11px; color: var(--muted);
+}
+
+/* ── MAIN CONTENT AREA ── */
+.main-grid {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 0;
+  min-height: calc(100vh - 180px);
+}
+
+.main-panel { padding: 28px 32px; }
+
+.side-panel {
+  border-left: 1px solid var(--border);
+  padding: 0;
+  display: flex; flex-direction: column;
+}
+
+/* ── PANEL HEADER ── */
+.panel-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.panel-title {
+  font-size: 14px; font-weight: 700; letter-spacing: 0.02em;
+  color: var(--text);
+}
+
+.panel-tag {
+  font-family: 'Fira Code', monospace;
+  font-size: 10px; letter-spacing: 0.08em;
+  padding: 3px 10px; border-radius: 3px;
+}
+
+.tag-cyan { background: rgba(0,212,255,0.1); border: 1px solid rgba(0,212,255,0.2); color: var(--accent); }
+.tag-green { background: rgba(127,255,106,0.1); border: 1px solid rgba(127,255,106,0.2); color: var(--accent2); }
+.tag-orange { background: rgba(255,107,53,0.1); border: 1px solid rgba(255,107,53,0.2); color: var(--accent3); }
+.tag-purple { background: rgba(176,106,255,0.1); border: 1px solid rgba(176,106,255,0.2); color: var(--accent4); }
+
+/* ── CONTRACT CARDS ── */
+.contract-card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 10px; padding: 20px;
+  margin-bottom: 12px;
+  position: relative; overflow: hidden;
+  transition: border-color 0.2s, transform 0.2s;
+}
+
+.contract-card:hover {
+  border-color: rgba(0,212,255,0.25);
+  transform: translateX(3px);
+}
+
+.contract-card::before {
+  content: '';
+  position: absolute; left: 0; top: 0; bottom: 0;
+  width: 3px;
+}
+.cc-token::before { background: var(--accent); }
+.cc-stake::before { background: var(--accent2); }
+.cc-merkle::before { background: var(--accent3); }
+.cc-reward::before { background: var(--accent4); }
+
+.cc-top {
+  display: flex; align-items: flex-start;
+  justify-content: space-between; margin-bottom: 12px;
+}
+
+.cc-name { font-size: 14px; font-weight: 700; margin-bottom: 3px; }
+
+.cc-file {
+  font-family: 'Fira Code', monospace;
+  font-size: 10px; color: var(--muted); letter-spacing: 0.04em;
+}
+
+.cc-status {
+  font-family: 'Fira Code', monospace;
+  font-size: 10px; padding: 3px 9px; border-radius: 3px;
+}
+
+.status-deployed {
+  background: rgba(127,255,106,0.1);
+  border: 1px solid rgba(127,255,106,0.25);
+  color: var(--accent2);
+}
+
+.status-pending {
+  background: rgba(255,107,53,0.1);
+  border: 1px solid rgba(255,107,53,0.25);
+  color: var(--accent3);
+}
+
+.cc-props {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.cc-prop {
+  background: rgba(0,0,0,0.3);
+  border: 1px solid var(--border);
+  border-radius: 5px; padding: 8px 10px;
+}
+
+.cc-prop-key {
+  font-family: 'Fira Code', monospace;
+  font-size: 9px; letter-spacing: 0.08em;
+  color: var(--muted); text-transform: uppercase; margin-bottom: 3px;
+}
+
+.cc-prop-val {
+  font-family: 'Fira Code', monospace;
+  font-size: 12px; color: var(--text); font-weight: 500;
+}
+
+/* ── CODE BLOCK ── */
+.code-block {
+  background: rgba(0,0,0,0.5);
+  border: 1px solid var(--border);
+  border-radius: 8px; padding: 0;
+  overflow: hidden; margin-bottom: 16px;
+  font-family: 'Fira Code', monospace;
+}
+
+.code-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 16px;
+  background: rgba(0,0,0,0.3);
+  border-bottom: 1px solid var(--border);
+}
+
+.code-filename {
+  font-size: 11px; color: var(--accent);
+  letter-spacing: 0.04em;
+}
+
+.code-lang {
+  font-size: 10px; color: var(--muted);
+  background: rgba(255,255,255,0.04);
+  padding: 2px 8px; border-radius: 3px;
+}
+
+.code-body {
+  padding: 16px;
+  font-size: 11.5px; line-height: 1.75;
+  color: #a0c0e0;
+  overflow-x: auto; max-height: 280px;
+  overflow-y: auto;
+}
+
+.code-body::-webkit-scrollbar { width: 4px; height: 4px; }
+.code-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* Syntax colors */
+.kw { color: #b06aff; }  /* keywords */
+.ty { color: #00d4ff; }  /* types */
+.fn { color: #7fff6a; }  /* functions */
+.st { color: #ff9966; }  /* strings */
+.cm { color: #3a6080; font-style: italic; }  /* comments */
+.nm { color: #ffd080; }  /* numbers */
+.dc { color: #ff6b35; }  /* decorators */
+
+/* ── MERKLE VISUALIZER ── */
+.merkle-tree {
+  display: flex; flex-direction: column;
+  align-items: center; gap: 0;
+  padding: 20px 0; overflow: auto;
+}
+
+.merkle-level {
+  display: flex; gap: 8px; justify-content: center;
+  margin-bottom: 6px;
+  position: relative;
+}
+
+.merkle-node {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 6px; padding: 5px 10px;
+  font-family: 'Fira Code', monospace; font-size: 9px;
+  color: var(--muted); cursor: pointer;
+  transition: all 0.2s; white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+
+.merkle-node:hover,
+.merkle-node.highlight {
+  border-color: rgba(0,212,255,0.4);
+  color: var(--accent);
+  background: rgba(0,212,255,0.06);
+}
+
+.merkle-node.root {
+  background: rgba(0,212,255,0.1);
+  border-color: rgba(0,212,255,0.4);
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.merkle-node.leaf {
+  border-color: rgba(127,255,106,0.2);
+  color: var(--accent2);
+}
+
+.merkle-node.proof-path {
+  background: rgba(255,107,53,0.1);
+  border-color: rgba(255,107,53,0.4);
+  color: var(--accent3);
+  animation: pulseNode 0.6s ease infinite alternate;
+}
+
+@keyframes pulseNode { from { box-shadow: none; } to { box-shadow: 0 0 8px rgba(255,107,53,0.4); } }
+
+.merkle-connector { color: var(--muted); font-size: 12px; }
+
+/* ── STAKING SIMULATOR ── */
+.stake-form {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 10px; padding: 20px;
+}
+
+.form-row {
+  display: flex; gap: 10px; margin-bottom: 12px;
+  align-items: flex-end;
+}
+
+.form-group { flex: 1; }
+
+.form-label {
+  font-family: 'Fira Code', monospace;
+  font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 6px; display: block;
+}
+
+.form-input {
+  width: 100%; padding: 9px 12px;
+  background: rgba(0,0,0,0.4); border: 1px solid var(--border);
+  border-radius: 5px; color: var(--text);
+  font-family: 'Fira Code', monospace; font-size: 13px;
+  outline: none; transition: border-color 0.2s;
+}
+.form-input:focus { border-color: rgba(0,212,255,0.4); }
+
+.act-btn {
+  padding: 9px 18px; border: none; border-radius: 5px;
+  font-family: 'Syne', sans-serif; font-weight: 700; font-size: 12px;
+  cursor: pointer; transition: all 0.2s; letter-spacing: 0.04em;
+}
+.act-btn.primary {
+  background: var(--accent); color: #000;
+}
+.act-btn.primary:hover { background: #00b8d9; transform: translateY(-1px); box-shadow: 0 6px 18px rgba(0,212,255,0.3); }
+
+.act-btn.secondary {
+  background: rgba(127,255,106,0.15);
+  border: 1px solid rgba(127,255,106,0.3);
+  color: var(--accent2);
+}
+.act-btn.secondary:hover { background: rgba(127,255,106,0.25); }
+
+.act-btn.danger {
+  background: rgba(255,107,53,0.15);
+  border: 1px solid rgba(255,107,53,0.3);
+  color: var(--accent3);
+}
+.act-btn.danger:hover { background: rgba(255,107,53,0.25); }
+
+/* ── POSITIONS TABLE ── */
+.positions-table {
+  width: 100%; border-collapse: collapse;
+  font-size: 12px;
+}
+
+.positions-table th {
+  font-family: 'Fira Code', monospace;
+  font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--muted); padding: 10px 12px;
+  text-align: left; border-bottom: 1px solid var(--border);
+}
+
+.positions-table td {
+  padding: 11px 12px; border-bottom: 1px solid rgba(17,29,53,0.5);
+  font-family: 'Fira Code', monospace; color: var(--mid);
+  vertical-align: middle;
+}
+
+.positions-table tr:hover td { background: rgba(0,212,255,0.02); }
+
+.pos-addr { font-size: 11px; color: var(--muted); }
+
+.pos-amount { color: var(--accent); font-weight: 500; }
+
+.pos-reward { color: var(--accent2); }
+
+.pos-badge {
+  font-size: 9px; padding: 2px 8px; border-radius: 3px;
+  display: inline-block;
+}
+
+/* ── EVENT FEED (SIDE PANEL) ── */
+.event-feed-header {
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+
+.event-feed-title {
+  font-size: 13px; font-weight: 700;
+}
+
+.event-scroll {
+  flex: 1; overflow-y: auto; padding: 12px;
+}
+.event-scroll::-webkit-scrollbar { width: 3px; }
+.event-scroll::-webkit-scrollbar-thumb { background: var(--border); }
+
+.event-item {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 6px; padding: 10px 12px; margin-bottom: 8px;
+  animation: fadeSlide 0.3s ease;
+  position: relative; overflow: hidden;
+}
+
+.event-item::before {
+  content: '';
+  position: absolute; left: 0; top: 0; bottom: 0; width: 2px;
+}
+
+.ev-stake::before { background: var(--accent2); }
+.ev-unstake::before { background: var(--accent3); }
+.ev-claim::before { background: var(--accent); }
+.ev-reward::before { background: var(--accent4); }
+.ev-transfer::before { background: var(--mid); }
+
+.event-type {
+  font-family: 'Fira Code', monospace;
+  font-size: 10px; letter-spacing: 0.08em;
+  text-transform: uppercase; margin-bottom: 4px;
+}
+
+.ev-stake .event-type { color: var(--accent2); }
+.ev-unstake .event-type { color: var(--accent3); }
+.ev-claim .event-type { color: var(--accent); }
+.ev-reward .event-type { color: var(--accent4); }
+.ev-transfer .event-type { color: var(--mid); }
+
+.event-detail {
+  font-family: 'Fira Code', monospace;
+  font-size: 11px; color: var(--muted); line-height: 1.5;
+}
+
+.event-detail b { color: var(--text); font-weight: 400; }
+
+.event-block {
+  font-family: 'Fira Code', monospace;
+  font-size: 9px; color: #2a4060; margin-top: 4px;
+}
+
+/* ── API PANEL ── */
+.api-endpoint {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 8px; margin-bottom: 10px; overflow: hidden;
+  transition: border-color 0.2s;
+}
+
+.api-endpoint:hover { border-color: rgba(0,212,255,0.2); }
+
+.api-header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 16px; cursor: pointer;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.2s;
+}
+
+.api-endpoint.open .api-header { border-color: var(--border); }
+
+.http-method {
+  font-family: 'Fira Code', monospace; font-size: 10px;
+  font-weight: 600; padding: 3px 8px; border-radius: 3px;
+  min-width: 46px; text-align: center; letter-spacing: 0.04em;
+}
+
+.get { background: rgba(127,255,106,0.1); color: var(--accent2); border: 1px solid rgba(127,255,106,0.2); }
+.post { background: rgba(0,212,255,0.1); color: var(--accent); border: 1px solid rgba(0,212,255,0.2); }
+
+.api-path {
+  font-family: 'Fira Code', monospace; font-size: 12px; color: var(--text);
+  flex: 1;
+}
+
+.api-desc { font-size: 11px; color: var(--muted); }
+
+.api-body { padding: 14px 16px; }
+
+.api-response {
+  background: rgba(0,0,0,0.5); border-radius: 6px; padding: 12px 14px;
+  font-family: 'Fira Code', monospace; font-size: 11px;
+  line-height: 1.7; color: #6090c0; overflow: auto; max-height: 200px;
+}
+
+/* ── GAS TABLE ── */
+.gas-table {
+  width: 100%; border-collapse: collapse; font-size: 12px;
+}
+
+.gas-table th {
+  font-family: 'Fira Code', monospace;
+  font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--muted); padding: 10px 12px;
+  text-align: left; border-bottom: 1px solid var(--border);
+}
+
+.gas-table td {
+  padding: 10px 12px; border-bottom: 1px solid rgba(17,29,53,0.5);
+  font-family: 'Fira Code', monospace;
+}
+
+.gas-bar-wrap {
+  background: rgba(0,0,0,0.4); border-radius: 3px;
+  height: 6px; width: 100%; overflow: hidden;
+}
+
+.gas-bar {
+  height: 100%; border-radius: 3px;
+  background: linear-gradient(90deg, var(--accent), var(--accent4));
+  transition: width 0.5s ease;
+}
+
+/* ── SCAN LINE EFFECT ── */
+.scan-overlay {
+  position: fixed; inset: 0; pointer-events: none;
+  z-index: 200;
+  background: linear-gradient(
+    transparent 50%,
+    rgba(0,212,255,0.008) 50%
+  );
+  background-size: 100% 4px;
+}
+
+/* ── RESPONSIVE ── */
+@media (max-width: 1100px) {
+  .overview-grid { grid-template-columns: 1fr 1fr; }
+  .main-grid { grid-template-columns: 1fr; }
+  .side-panel { border-left: none; border-top: 1px solid var(--border); }
+}
+
+@media (max-width: 700px) {
+  .topnav { padding: 14px 16px; }
+  .nav-pills { display: none; }
+  .main-panel { padding: 16px; }
+}
+</style>
+</head>
+<body>
+
+<div class="scan-overlay"></div>
+
+<!-- ── NAV ── -->
+<nav class="topnav">
+  <div class="logo">Coin<span>Quant</span> · EVM System</div>
+  <div class="nav-pills">
+    <button class="npill active" onclick="switchTab('contracts', this)">Contracts</button>
+    <button class="npill" onclick="switchTab('staking', this)">Staking</button>
+    <button class="npill" onclick="switchTab('merkle', this)">Merkle Airdrop</button>
+    <button class="npill" onclick="switchTab('api', this)">Python API</button>
+    <button class="npill" onclick="switchTab('gas', this)">Gas Analysis</button>
+  </div>
+  <div class="chain-badge">
+    <div class="chain-dot"></div>
+    Sepolia Testnet
+  </div>
+</nav>
+
+<!-- ── OVERVIEW METRICS ── -->
+<div class="overview-grid">
+  <div class="metric-block">
+    <div class="metric-label">Total Staked</div>
+    <div class="metric-val cyan" id="m-staked">2,847,500</div>
+    <div class="metric-sub">CQT tokens locked</div>
+  </div>
+  <div class="metric-block">
+    <div class="metric-label">Airdrop Claims</div>
+    <div class="metric-val green" id="m-claims">1,243 / 5,000</div>
+    <div class="metric-sub">Merkle verified ✓</div>
+  </div>
+  <div class="metric-block">
+    <div class="metric-label">Rewards Distributed</div>
+    <div class="metric-val orange" id="m-rewards">184,920</div>
+    <div class="metric-sub">CQT emitted to stakers</div>
+  </div>
+  <div class="metric-block">
+    <div class="metric-label">Active Stakers</div>
+    <div class="metric-val purple" id="m-stakers">287</div>
+    <div class="metric-sub">Unique addresses</div>
+  </div>
+</div>
+
+<!-- ── CONTENT AREA ── -->
+<div class="main-grid">
+  <div class="main-panel">
+
+    <!-- TAB: CONTRACTS -->
+    <div class="tab active" id="tab-contracts">
+      <div class="panel-header">
+        <div class="panel-title">Deployed Contract Architecture</div>
+        <span class="panel-tag tag-cyan">SOLIDITY 0.8.24</span>
+      </div>
+
+      <div class="contract-card cc-token">
+        <div class="cc-top">
+          <div>
+            <div class="cc-name">CQT Token</div>
+            <div class="cc-file">Token.sol · ERC20 + Roles + Pausable</div>
+          </div>
+          <div class="cc-status status-deployed">DEPLOYED</div>
+        </div>
+        <div class="cc-props">
+          <div class="cc-prop">
+            <div class="cc-prop-key">Address</div>
+            <div class="cc-prop-val">0x3fA8...d214</div>
+          </div>
+          <div class="cc-prop">
+            <div class="cc-prop-key">Total Supply</div>
+            <div class="cc-prop-val">100,000,000 CQT</div>
+          </div>
+          <div class="cc-prop">
+            <div class="cc-prop-key">Access Control</div>
+            <div class="cc-prop-val">MINTER + PAUSER</div>
+          </div>
+          <div class="cc-prop">
+            <div class="cc-prop-key">Gas (deploy)</div>
+            <div class="cc-prop-val">~1.2M gas</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="contract-card cc-stake">
+        <div class="cc-top">
+          <div>
+            <div class="cc-name">StakingVault</div>
+            <div class="cc-file">StakingVault.sol · ReentrancyGuard + Pausable</div>
+          </div>
+          <div class="cc-status status-deployed">DEPLOYED</div>
+        </div>
+        <div class="cc-props">
+          <div class="cc-prop">
+            <div class="cc-prop-key">Address</div>
+            <div class="cc-prop-val">0x7c2B...a831</div>
+          </div>
+          <div class="cc-prop">
+            <div class="cc-prop-key">Reward Rate</div>
+            <div class="cc-prop-val">1.2% / day</div>
+          </div>
+          <div class="cc-prop">
+            <div class="cc-prop-key">Pattern</div>
+            <div class="cc-prop-val">Checks-Effects-Int.</div>
+          </div>
+          <div class="cc-prop">
+            <div class="cc-prop-key">Min Stake</div>
+            <div class="cc-prop-val">100 CQT</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="contract-card cc-merkle">
+        <div class="cc-top">
+          <div>
+            <div class="cc-name">MerkleDistributor</div>
+            <div class="cc-file">MerkleDistributor.sol · OpenZeppelin MerkleProof</div>
+          </div>
+          <div class="cc-status status-deployed">DEPLOYED</div>
+        </div>
+        <div class="cc-props">
+          <div class="cc-prop">
+            <div class="cc-prop-key">Address</div>
+            <div class="cc-prop-val">0x9eF1...c562</div>
+          </div>
+          <div class="cc-prop">
+            <div class="cc-prop-key">Merkle Root</div>
+            <div class="cc-prop-val">0xab4f...8812</div>
+          </div>
+          <div class="cc-prop">
+            <div class="cc-prop-key">Claim Window</div>
+            <div class="cc-prop-val">90 days</div>
+          </div>
+          <div class="cc-prop">
+            <div class="cc-prop-key">Total Allocated</div>
+            <div class="cc-prop-val">5,000,000 CQT</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-filename">StakingVault.sol (excerpt)</span>
+          <span class="code-lang">Solidity</span>
+        </div>
+        <div class="code-body"><span class="cm">// SPDX-License-Identifier: MIT</span>
+<span class="kw">pragma solidity</span> <span class="nm">^0.8.24</span>;
+
+<span class="kw">import</span> <span class="st">"@openzeppelin/contracts/utils/ReentrancyGuard.sol"</span>;
+<span class="kw">import</span> <span class="st">"@openzeppelin/contracts/token/ERC20/IERC20.sol"</span>;
+
+<span class="kw">contract</span> <span class="ty">StakingVault</span> <span class="kw">is</span> <span class="ty">ReentrancyGuard</span>, <span class="ty">Pausable</span> {
+    <span class="kw">using</span> <span class="ty">SafeERC20</span> <span class="kw">for</span> <span class="ty">IERC20</span>;
+
+    <span class="kw">struct</span> <span class="ty">Position</span> {
+        <span class="ty">uint256</span> amount;
+        <span class="ty">uint256</span> rewardDebt;
+        <span class="ty">uint256</span> stakedAt;
+    }
+
+    <span class="ty">mapping</span>(<span class="ty">address</span> => <span class="ty">Position</span>) <span class="kw">public</span> positions;
+    <span class="ty">uint256</span> <span class="kw">public</span> rewardPerTokenStored;
+    <span class="ty">uint256</span> <span class="kw">public</span> totalStaked;
+
+    <span class="cm">/// @dev Checks-Effects-Interactions pattern enforced</span>
+    <span class="kw">function</span> <span class="fn">stake</span>(<span class="ty">uint256</span> amount) <span class="kw">external</span> <span class="kw">nonReentrant</span> <span class="kw">whenNotPaused</span> {
+        <span class="kw">if</span> (amount < MIN_STAKE) <span class="kw">revert</span> <span class="ty">BelowMinimum</span>();
+
+        _updateRewards(msg.sender);        <span class="cm">// effects first</span>
+        positions[msg.sender].amount += amount;
+        totalStaked += amount;
+
+        token.safeTransferFrom(msg.sender, <span class="kw">address</span>(<span class="kw">this</span>), amount);
+        <span class="kw">emit</span> <span class="fn">Staked</span>(msg.sender, amount, block.timestamp);
+    }
+
+    <span class="kw">function</span> <span class="fn">claimRewards</span>() <span class="kw">external</span> <span class="kw">nonReentrant</span> {
+        _updateRewards(msg.sender);
+        <span class="ty">uint256</span> reward = earned[msg.sender];
+        <span class="kw">if</span> (reward == <span class="nm">0</span>) <span class="kw">revert</span> <span class="ty">NothingToClaim</span>();
+        earned[msg.sender] = <span class="nm">0</span>;              <span class="cm">// state before transfer</span>
+        rewardToken.safeTransfer(msg.sender, reward);
+        <span class="kw">emit</span> <span class="fn">RewardClaimed</span>(msg.sender, reward);
+    }
+}</div>
+      </div>
+    </div>
+
+    <!-- TAB: STAKING -->
+    <div class="tab" id="tab-staking">
+      <div class="panel-header">
+        <div class="panel-title">Staking Simulator</div>
+        <span class="panel-tag tag-green">StakingVault.sol</span>
+      </div>
+
+      <div class="stake-form" style="margin-bottom:20px;">
+        <div style="font-family:'Fira Code',monospace;font-size:10px;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:14px;">SIMULATE TRANSACTION</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Wallet Address</label>
+            <input class="form-input" id="stakeAddr" value="0xAbC1...demo" placeholder="0x...">
+          </div>
+          <div class="form-group" style="max-width:160px;">
+            <label class="form-label">Amount (CQT)</label>
+            <input class="form-input" id="stakeAmt" type="number" value="5000" min="100">
+          </div>
+        </div>
+        <div class="form-row">
+          <button class="act-btn primary" onclick="doStake()">STAKE</button>
+          <button class="act-btn secondary" onclick="doClaim()">CLAIM REWARDS</button>
+          <button class="act-btn danger" onclick="doUnstake()">UNSTAKE</button>
+        </div>
+        <div id="txResult" style="font-family:'Fira Code',monospace;font-size:11px;color:var(--accent2);margin-top:10px;min-height:18px;"></div>
+      </div>
+
+      <div class="panel-header">
+        <div class="panel-title">Active Staking Positions</div>
+        <span class="panel-tag tag-cyan" id="posCount">4 positions</span>
+      </div>
+      <table class="positions-table" id="positionsTable">
+        <thead>
+          <tr>
+            <th>Address</th>
+            <th>Staked (CQT)</th>
+            <th>Pending Reward</th>
+            <th>APY</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="positionsBody"></tbody>
+      </table>
+    </div>
+
+    <!-- TAB: MERKLE -->
+    <div class="tab" id="tab-merkle">
+      <div class="panel-header">
+        <div class="panel-title">Merkle Tree Airdrop</div>
+        <span class="panel-tag tag-orange">MerkleDistributor.sol</span>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+        <div>
+          <div style="font-family:'Fira Code',monospace;font-size:10px;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:10px;">ALLOCATION CSV INPUT</div>
+          <div class="code-block" style="margin:0;">
+            <div class="code-header">
+              <span class="code-filename">allocations.csv</span>
+              <span class="code-lang">Data</span>
+            </div>
+            <div class="code-body" style="max-height:160px;">address,amount
+0xAlice...1234, 10000
+0xBob...5678,   7500
+0xCarol...9abc, 12500
+0xDave...def0,  5000
+0xEve...1111,   8750
+0xFrank...2222, 6250
+0xGrace...3333, 9000
+0xHank...4444,  11000</div>
+          </div>
+        </div>
+        <div>
+          <div style="font-family:'Fira Code',monospace;font-size:10px;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:10px;">PYTHON GENERATOR OUTPUT</div>
+          <div class="code-block" style="margin:0;">
+            <div class="code-header">
+              <span class="code-filename">merkle_output.json</span>
+              <span class="code-lang">Python/Web3.py</span>
+            </div>
+            <div class="code-body" style="max-height:160px;"><span class="nm">{</span>
+  <span class="st">"root"</span>: <span class="st">"0xab4f2e...8812"</span>,
+  <span class="st">"total"</span>: <span class="nm">70000</span>,
+  <span class="st">"recipients"</span>: <span class="nm">8</span>,
+  <span class="st">"proofs"</span>: {
+    <span class="st">"0xAlice..."</span>: {
+      <span class="st">"amount"</span>: <span class="nm">10000</span>,
+      <span class="st">"proof"</span>: [<span class="st">"0x3f..."</span>, <span class="st">"0x8a..."</span>]
+    },
+    ...
+  }
+<span class="nm">}</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-bottom:14px;">
+        <div style="font-family:'Fira Code',monospace;font-size:10px;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:10px;">MERKLE TREE VISUALIZATION — Click a node to highlight proof path</div>
+        <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;overflow:auto;padding:16px;">
+          <div class="merkle-tree" id="merkleTree"></div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div>
+          <div style="font-family:'Fira Code',monospace;font-size:10px;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px;">SIMULATE CLAIM</div>
+          <div class="form-row" style="margin:0;">
+            <div class="form-group">
+              <select class="form-input" id="claimAddr" style="cursor:pointer;">
+                <option value="0">0xAlice...1234 (10,000 CQT)</option>
+                <option value="1">0xBob...5678 (7,500 CQT)</option>
+                <option value="2">0xCarol...9abc (12,500 CQT)</option>
+                <option value="3">0xDave...def0 (5,000 CQT)</option>
+              </select>
+            </div>
+            <button class="act-btn primary" onclick="simulateClaim()">CLAIM</button>
+          </div>
+          <div id="claimResult" style="font-family:'Fira Code',monospace;font-size:11px;color:var(--accent2);margin-top:10px;min-height:36px;line-height:1.6;"></div>
+        </div>
+        <div>
+          <div style="font-family:'Fira Code',monospace;font-size:10px;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px;">CLAIM STATUS</div>
+          <div id="claimStatus" style="font-family:'Fira Code',monospace;font-size:11px;line-height:1.8;color:var(--mid);"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: API -->
+    <div class="tab" id="tab-api">
+      <div class="panel-header">
+        <div class="panel-title">Python FastAPI Backend</div>
+        <span class="panel-tag tag-purple">FastAPI · Web3.py</span>
+      </div>
+
+      <div id="apiEndpoints"></div>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-filename">merkle_service.py</span>
+          <span class="code-lang">Python</span>
+        </div>
+        <div class="code-body"><span class="kw">from</span> web3 <span class="kw">import</span> Web3
+<span class="kw">from</span> eth_hash.auto <span class="kw">import</span> keccak
+<span class="kw">import</span> csv, json
+
+<span class="kw">def</span> <span class="fn">build_merkle_tree</span>(allocations: <span class="ty">list</span>[<span class="ty">dict</span>]) -> <span class="ty">dict</span>:
+    <span class="st">"""Generate Merkle tree from wallet allocations."""</span>
+    leaves = [
+        keccak(<span class="fn">encode_packed</span>(a[<span class="st">"address"</span>], a[<span class="st">"amount"</span>]))
+        <span class="kw">for</span> a <span class="kw">in</span> allocations
+    ]
+    tree = _build_tree(leaves)
+    root = tree[<span class="nm">0</span>]
+    proofs = {a[<span class="st">"address"</span>]: _get_proof(tree, i) <span class="kw">for</span> i, a <span class="kw">in</span> <span class="fn">enumerate</span>(allocations)}
+    <span class="kw">return</span> {<span class="st">"root"</span>: root.hex(), <span class="st">"proofs"</span>: proofs}
+
+<span class="dc">@app.post</span>(<span class="st">"/api/merkle/generate"</span>)
+<span class="kw">async def</span> <span class="fn">generate_merkle</span>(file: <span class="ty">UploadFile</span>):
+    allocations = <span class="fn">parse_csv</span>(<span class="kw">await</span> file.read())
+    result = <span class="fn">build_merkle_tree</span>(allocations)
+    <span class="kw">await</span> db.merkle_roots.<span class="fn">insert</span>(result)
+    <span class="kw">return</span> result
+
+<span class="dc">@app.get</span>(<span class="st">"/api/user/{address}/proof"</span>)
+<span class="kw">async def</span> <span class="fn">get_proof</span>(address: <span class="ty">str</span>):
+    proof = <span class="kw">await</span> db.proofs.<span class="fn">find_one</span>({<span class="st">"address"</span>: address})
+    <span class="kw">if not</span> proof: <span class="kw">raise</span> <span class="ty">HTTPException</span>(<span class="nm">404</span>)
+    <span class="kw">return</span> proof</div>
+      </div>
+    </div>
+
+    <!-- TAB: GAS -->
+    <div class="tab" id="tab-gas">
+      <div class="panel-header">
+        <div class="panel-title">Gas Optimization Report</div>
+        <span class="panel-tag tag-cyan">Foundry forge snapshot</span>
+      </div>
+
+      <table class="gas-table">
+        <thead>
+          <tr>
+            <th>Function</th>
+            <th>Contract</th>
+            <th>Gas (Optimized)</th>
+            <th>Savings</th>
+            <th>Relative Cost</th>
+          </tr>
+        </thead>
+        <tbody id="gasTable"></tbody>
+      </table>
+
+      <div style="margin-top:20px;">
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-filename">test/StakingVault.t.sol (Foundry)</span>
+            <span class="code-lang">Foundry</span>
+          </div>
+          <div class="code-body"><span class="kw">contract</span> <span class="ty">StakingVaultTest</span> <span class="kw">is</span> <span class="ty">Test</span> {
+    <span class="ty">StakingVault</span> vault;
+    <span class="ty">CQTToken</span> token;
+
+    <span class="kw">function</span> <span class="fn">setUp</span>() <span class="kw">public</span> {
+        token = <span class="kw">new</span> <span class="ty">CQTToken</span>(<span class="nm">100_000_000e18</span>);
+        vault = <span class="kw">new</span> <span class="ty">StakingVault</span>(<span class="ty">address</span>(token));
+        token.<span class="fn">approve</span>(<span class="ty">address</span>(vault), <span class="ty">type</span>(<span class="ty">uint256</span>).max);
+    }
+
+    <span class="kw">function</span> <span class="fn">test_stake_and_claim</span>() <span class="kw">public</span> {
+        vault.<span class="fn">stake</span>(<span class="nm">10_000e18</span>);
+        <span class="fn">vm.warp</span>(block.timestamp + <span class="nm">7 days</span>);
+        <span class="ty">uint256</span> reward = vault.<span class="fn">pendingReward</span>(address(<span class="kw">this</span>));
+        <span class="fn">assertGt</span>(reward, <span class="nm">0</span>);
+        vault.<span class="fn">claimRewards</span>();
+        <span class="fn">assertEq</span>(vault.<span class="fn">pendingReward</span>(address(<span class="kw">this</span>)), <span class="nm">0</span>);
+    }
+
+    <span class="kw">function</span> <span class="fn">testFuzz_reentrancy_protection</span>(<span class="ty">uint256</span> amount) <span class="kw">public</span> {
+        <span class="fn">vm.assume</span>(amount >= MIN_STAKE && amount <= MAX_STAKE);
+        <span class="cm">// Attempt reentrancy — should revert</span>
+        <span class="ty">Attacker</span> attacker = <span class="kw">new</span> <span class="ty">Attacker</span>(<span class="ty">address</span>(vault));
+        <span class="fn">vm.expectRevert</span>(<span class="ty">ReentrancyGuard__Reentrancy</span>.selector);
+        attacker.<span class="fn">attack</span>(amount);
+    }
+}</div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /main-panel -->
+
+  <!-- ── SIDE PANEL: EVENT FEED ── -->
+  <div class="side-panel">
+    <div class="event-feed-header">
+      <div class="event-feed-title">Live Event Indexer</div>
+      <div class="chain-badge" style="font-size:9px;padding:4px 10px;">
+        <div class="chain-dot"></div>
+        INDEXING
+      </div>
+    </div>
+    <div class="event-scroll" id="eventFeed"></div>
+  </div>
+</div>
+
+<script>
+// ── STATE ─────────────────────────────────────────────────────
+
+const GAS_DATA = [
+  { fn: "stake()", contract: "StakingVault", gas: 68420, savings: "18%", rel: 68 },
+  { fn: "claimRewards()", contract: "StakingVault", gas: 42180, savings: "12%", rel: 42 },
+  { fn: "unstake()", contract: "StakingVault", gas: 55900, savings: "15%", rel: 56 },
+  { fn: "claim(proof)", contract: "MerkleDistributor", gas: 51240, savings: "22%", rel: 51 },
+  { fn: "mint()", contract: "CQTToken", gas: 28740, savings: "8%", rel: 29 },
+  { fn: "transfer()", contract: "CQTToken", gas: 29180, savings: "5%", rel: 29 },
+  { fn: "distributeRewards()", contract: "RewardDistributor", gas: 84620, savings: "19%", rel: 85 },
+];
+
+const API_ENDPOINTS = [
+  {
+    method: "POST", path: "/api/merkle/generate",
+    desc: "Generate Merkle tree from CSV allocations",
+    response: `{
+  "root": "0xab4f2e8812...",
+  "total_recipients": 5000,
+  "total_tokens": 5000000,
+  "generated_at": "2026-02-27T10:30:00Z"
+}`
+  },
+  {
+    method: "GET", path: "/api/user/{address}/rewards",
+    desc: "Get staking rewards and proof for wallet",
+    response: `{
+  "address": "0xAlice...1234",
+  "staked": 10000,
+  "pending_reward": 847.5,
+  "airdrop_eligible": true,
+  "proof": ["0x3f2a...", "0x8b1c..."],
+  "claimed": false
+}`
+  },
+  {
+    method: "GET", path: "/api/events?contract=staking&limit=50",
+    desc: "Index on-chain events (polling via Web3.py)",
+    response: `[
+  { "event": "Staked", "from": "0xAbc...", "amount": 5000, "block": 8842191 },
+  { "event": "RewardClaimed", "from": "0xDef...", "amount": 124.5, "block": 8842187 }
+]`
+  },
+  {
+    method: "POST", path: "/api/distribute/trigger",
+    desc: "Trigger automated reward distribution",
+    response: `{
+  "tx_hash": "0x7f2c4a...",
+  "recipients": 287,
+  "total_distributed": 18492.0,
+  "gas_used": 1842000
+}`
+  },
+];
+
+const POSITIONS = [
+  { addr: "0x3fA8...d214", amount: 850000, reward: 10200, apy: "438%", status: "ACTIVE" },
+  { addr: "0x7c2B...a831", amount: 500000, reward: 6000, apy: "438%", status: "ACTIVE" },
+  { addr: "0x9eF1...c562", amount: 250000, reward: 3000, apy: "438%", status: "ACTIVE" },
+  { addr: "0xA4d9...f118", amount: 1247500, reward: 14970, apy: "438%", status: "ACTIVE" },
+];
+
+const CLAIM_STATUS = [
+  { addr: "0xAlice...1234", amount: "10,000", claimed: true },
+  { addr: "0xBob...5678", amount: "7,500", claimed: false },
+  { addr: "0xCarol...9abc", amount: "12,500", claimed: true },
+  { addr: "0xDave...def0", amount: "5,000", claimed: false },
+];
+
+const EVENTS_POOL = [
+  { type: "ev-stake", label: "Staked", detail: "0x3fA8...d214 staked <b>5,000 CQT</b>", block: 8842191 },
+  { type: "ev-reward", label: "RewardClaimed", detail: "0x7c2B...a831 claimed <b>124.5 CQT</b>", block: 8842187 },
+  { type: "ev-claim", label: "AirdropClaimed", detail: "0xAlice...1234 claimed <b>10,000 CQT</b> via Merkle proof", block: 8842182 },
+  { type: "ev-unstake", label: "Unstaked", detail: "0x9eF1...c562 unstaked <b>2,500 CQT</b>", block: 8842179 },
+  { type: "ev-transfer", label: "Transfer", detail: "<b>25,000 CQT</b> → reward pool", block: 8842175 },
+  { type: "ev-stake", label: "Staked", detail: "0xB7ac...3381 staked <b>12,000 CQT</b>", block: 8842171 },
+  { type: "ev-reward", label: "RewardClaimed", detail: "0xC5de...9920 claimed <b>87.3 CQT</b>", block: 8842168 },
+  { type: "ev-claim", label: "AirdropClaimed", detail: "0xDave...def0 claimed <b>5,000 CQT</b> via Merkle proof", block: 8842161 },
+];
+
+let positions = [...POSITIONS];
+let eventBlock = 8842200;
+
+// ── RENDER FUNCTIONS ──────────────────────────────────────────
+
+function renderPositions() {
+  const tbody = document.getElementById('positionsBody');
+  tbody.innerHTML = '';
+  positions.forEach(p => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="pos-addr">${p.addr}</td>
+      <td class="pos-amount">${p.amount.toLocaleString()}</td>
+      <td class="pos-reward">${p.reward.toLocaleString()} CQT</td>
+      <td style="color:var(--accent4)">${p.apy}</td>
+      <td><span class="pos-badge status-deployed">${p.status}</span></td>
+    `;
+    tbody.appendChild(tr);
+  });
+  document.getElementById('posCount').textContent = `${positions.length} positions`;
+}
+
+function renderGasTable() {
+  const tbody = document.getElementById('gasTable');
+  tbody.innerHTML = '';
+  GAS_DATA.forEach(g => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="color:var(--accent);font-family:'Fira Code',monospace;">${g.fn}</td>
+      <td style="color:var(--mid);font-family:'Fira Code',monospace;font-size:11px;">${g.contract}</td>
+      <td style="color:var(--text);font-family:'Fira Code',monospace;">${g.gas.toLocaleString()}</td>
+      <td style="color:var(--accent2);font-family:'Fira Code',monospace;">${g.savings}</td>
+      <td style="width:120px;">
+        <div class="gas-bar-wrap">
+          <div class="gas-bar" style="width:${g.rel}%"></div>
+        </div>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function renderApiEndpoints() {
+  const container = document.getElementById('apiEndpoints');
+  container.innerHTML = '';
+  API_ENDPOINTS.forEach((ep, i) => {
+    const div = document.createElement('div');
+    div.className = 'api-endpoint';
+    div.innerHTML = `
+      <div class="api-header" onclick="toggleApi(this)">
+        <div class="http-method ${ep.method.toLowerCase()}">${ep.method}</div>
+        <div class="api-path">${ep.path}</div>
+        <div class="api-desc">${ep.desc}</div>
+      </div>
+      <div class="api-body" style="display:none;">
+        <div style="font-family:'Fira Code',monospace;font-size:10px;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px;">RESPONSE SCHEMA</div>
+        <div class="api-response">${ep.response}</div>
+      </div>
+    `;
+    container.appendChild(div);
+  });
+}
+
+function toggleApi(header) {
+  const ep = header.parentElement;
+  const body = ep.querySelector('.api-body');
+  const isOpen = ep.classList.contains('open');
+  document.querySelectorAll('.api-endpoint.open').forEach(e => {
+    e.classList.remove('open');
+    e.querySelector('.api-body').style.display = 'none';
+  });
+  if (!isOpen) {
+    ep.classList.add('open');
+    body.style.display = 'block';
+  }
+}
+
+// ── MERKLE TREE ────────────────────────────────────────────────
+
+const LEAVES = ['Alice', 'Bob', 'Carol', 'Dave', 'Eve', 'Frank', 'Grace', 'Hank'];
+const TREE_LEVELS = [
+  // [hash short labels]
+  ["ROOT: 0xab4f...8812"],
+  ["0x3f2a...c1", "0x9d8b...e4"],
+  ["0x1a2b...aa", "0x5c6d...bb", "0x7e8f...cc", "0xa0b1...dd"],
+  LEAVES.map(n => `${n}: 0x${Math.random().toString(16).slice(2,6)}...`),
+];
+
+function renderMerkleTree() {
+  const container = document.getElementById('merkleTree');
+  container.innerHTML = '';
+  TREE_LEVELS.forEach((level, li) => {
+    const row = document.createElement('div');
+    row.className = 'merkle-level';
+    row.style.marginTop = li === 0 ? '0' : '4px';
+    level.forEach((node, ni) => {
+      const n = document.createElement('div');
+      n.className = 'merkle-node' + (li === 0 ? ' root' : li === 3 ? ' leaf' : '');
+      n.textContent = node;
+      n.dataset.level = li;
+      n.dataset.idx = ni;
+      n.onclick = () => highlightProof(li, ni);
+      row.appendChild(n);
+    });
+    container.appendChild(row);
+    if (li < TREE_LEVELS.length - 1) {
+      const conn = document.createElement('div');
+      conn.className = 'merkle-connector';
+      conn.style.cssText = 'display:flex;justify-content:center;gap:4px;font-size:14px;color:var(--border);letter-spacing:4px;';
+      conn.textContent = '│   '.repeat(Math.max(1, level.length / 2));
+      container.appendChild(conn);
+    }
+  });
+}
+
+function highlightProof(level, idx) {
+  document.querySelectorAll('.merkle-node').forEach(n => n.classList.remove('proof-path'));
+  if (level === 3) {
+    const nodes = document.querySelectorAll('.merkle-node');
+    let leafNodes = [...nodes].filter(n => n.dataset.level == 3);
+    leafNodes[idx]?.classList.add('proof-path');
+    const parentIdx = Math.floor(idx / 2);
+    let level2 = [...nodes].filter(n => n.dataset.level == 2);
+    const sibling = idx % 2 === 0 ? level2[parentIdx * 2 + 1] : level2[parentIdx * 2];
+    sibling?.classList.add('proof-path');
+    let level1 = [...nodes].filter(n => n.dataset.level == 1);
+    const gpIdx = Math.floor(parentIdx / 2);
+    const gpSib = parentIdx % 2 === 0 ? level1[gpIdx * 2 + 1] : level1[gpIdx * 2];
+    gpSib?.classList.add('proof-path');
+    document.querySelectorAll('.merkle-node.root').forEach(n => n.classList.add('highlight'));
+  }
+}
+
+// ── STAKING SIMULATOR ─────────────────────────────────────────
+
+function doStake() {
+  const addr = document.getElementById('stakeAddr').value || `0x${Math.random().toString(16).slice(2,10)}...`;
+  const amt = parseInt(document.getElementById('stakeAmt').value) || 5000;
+  if (amt < 100) { setTxResult('ERROR: Below minimum stake (100 CQT)', 'var(--accent3)'); return; }
+
+  const short = addr.length > 12 ? addr.slice(0, 10) + '...' : addr;
+  positions.push({
+    addr: short, amount: amt,
+    reward: Math.floor(amt * 0.012),
+    apy: '438%', status: 'ACTIVE'
+  });
+  renderPositions();
+  updateMetric('m-stakers', positions.length + 280);
+  updateMetric('m-staked', positions.reduce((a, p) => a + p.amount, 0).toLocaleString());
+  setTxResult(`✓ TX: 0x${Math.random().toString(16).slice(2,10)}... | Staked ${amt.toLocaleString()} CQT from ${short}`, 'var(--accent2)');
+  pushEvent('ev-stake', 'Staked', `${short} staked <b>${amt.toLocaleString()} CQT</b>`);
+}
+
+function doClaim() {
+  if (positions.length === 0) return;
+  const p = positions[Math.floor(Math.random() * positions.length)];
+  setTxResult(`✓ TX: 0x${Math.random().toString(16).slice(2,10)}... | ${p.addr} claimed ${p.reward.toLocaleString()} CQT rewards`, 'var(--accent)');
+  updateMetric('m-rewards', (parseInt(document.getElementById('m-rewards').textContent.replace(/,/g, '')) + p.reward).toLocaleString());
+  pushEvent('ev-reward', 'RewardClaimed', `${p.addr} claimed <b>${p.reward.toLocaleString()} CQT</b>`);
+}
+
+function doUnstake() {
+  if (positions.length <= 1) { setTxResult('ERROR: No removable positions', 'var(--accent3)'); return; }
+  const removed = positions.pop();
+  renderPositions();
+  setTxResult(`✓ TX: 0x${Math.random().toString(16).slice(2,10)}... | ${removed.addr} unstaked ${removed.amount.toLocaleString()} CQT`, 'var(--accent3)');
+  pushEvent('ev-unstake', 'Unstaked', `${removed.addr} unstaked <b>${removed.amount.toLocaleString()} CQT</b>`);
+}
+
+function setTxResult(msg, color = 'var(--accent2)') {
+  const el = document.getElementById('txResult');
+  el.style.color = color;
+  el.textContent = msg;
+}
+
+function updateMetric(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = val;
+}
+
+// ── MERKLE CLAIM SIMULATOR ────────────────────────────────────
+
+function simulateClaim() {
+  const idx = parseInt(document.getElementById('claimAddr').value);
+  const recipient = CLAIM_STATUS[idx];
+  const result = document.getElementById('claimResult');
+  const statusEl = document.getElementById('claimStatus');
+
+  if (recipient.claimed) {
+    result.style.color = 'var(--accent3)';
+    result.textContent = `✗ REVERT: AlreadyClaimed()\n${recipient.addr} has already claimed their allocation.`;
+    return;
+  }
+
+  recipient.claimed = true;
+  result.style.color = 'var(--accent2)';
+  result.innerHTML = `✓ TX: 0x${Math.random().toString(16).slice(2, 10)}...<br>Merkle proof verified · ${recipient.amount} CQT transferred to ${recipient.addr}`;
+  updateMetric('m-claims', `${CLAIM_STATUS.filter(c => c.claimed).length} / 5,000`);
+  pushEvent('ev-claim', 'AirdropClaimed', `${recipient.addr} claimed <b>${recipient.amount} CQT</b> via Merkle proof`);
+
+  renderClaimStatus();
+}
+
+function renderClaimStatus() {
+  const el = document.getElementById('claimStatus');
+  el.innerHTML = CLAIM_STATUS.map(c => `
+    <span style="color:${c.claimed ? 'var(--accent2)' : 'var(--muted)'}">
+      ${c.claimed ? '✓' : '○'} ${c.addr} · ${c.amount} CQT ${c.claimed ? '<span style="color:var(--accent2);font-size:9px;">CLAIMED</span>' : ''}
+    </span><br>
+  `).join('');
+}
+
+// ── EVENT FEED ────────────────────────────────────────────────
+
+function pushEvent(type, label, detail) {
+  eventBlock++;
+  const feed = document.getElementById('eventFeed');
+  const ev = document.createElement('div');
+  ev.className = `event-item ${type}`;
+  ev.innerHTML = `
+    <div class="event-type">${label}</div>
+    <div class="event-detail">${detail}</div>
+    <div class="event-block">Block #${eventBlock} · ${new Date().toLocaleTimeString()}</div>
+  `;
+  feed.insertBefore(ev, feed.firstChild);
+  if (feed.children.length > 20) feed.removeChild(feed.lastChild);
+}
+
+// Auto events
+function autoEvent() {
+  const pool = EVENTS_POOL;
+  const e = pool[Math.floor(Math.random() * pool.length)];
+  const b = eventBlock + Math.floor(Math.random() * 3 + 1);
+  eventBlock = b;
+  pushEvent(e.type, e.label, e.detail);
+}
+
+// Seed initial events
+EVENTS_POOL.slice(0, 5).forEach((e, i) => {
+  setTimeout(() => pushEvent(e.type, e.label, e.detail), i * 150);
+});
+setInterval(autoEvent, 3200);
+
+// ── TAB SWITCHING ─────────────────────────────────────────────
+
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.npill').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name)?.classList.add('active');
+  btn.classList.add('active');
+}
+
+// ── INIT ──────────────────────────────────────────────────────
+
+renderPositions();
+renderGasTable();
+renderApiEndpoints();
+renderMerkleTree();
+renderClaimStatus();
+</script>
+</body>
+</html>
