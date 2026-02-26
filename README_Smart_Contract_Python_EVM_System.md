@@ -167,7 +167,3 @@ Week 3
 - Reward distribution systems
 - Airdrop automation platforms
 - Production-grade EVM infrastructure
-
----
-
-Author: Senior Smart Contract + Backend Engineer
